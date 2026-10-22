@@ -1,0 +1,13 @@
+# What `gcloud run deploy --source .` does not upload.
+.git
+.gitignore
+.venv/
+**/__pycache__/
+**/.pytest_cache/
+vendor/simcore/.git/
+vendor/simcore/.venv/
+vendor/simcore/tests/
+vendor/simcore/notebooks/
+vendor/simcore/design/
+vendor/simcore/tools/
+tests/
