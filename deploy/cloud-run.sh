@@ -17,6 +17,7 @@ REGION="${REGION:-europe-west1}"
 SERVICE="${SERVICE:-simfull-app}"
 SIMCORE_REF="${SIMCORE_REF:-main}"
 PROJECT="${PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
+GITHUB_TOKEN="$(echo "${GITHUB_TOKEN:-}" | tr -d '[:space:]')"
 
 if [ -z "$PROJECT" ]; then
   echo "No Google Cloud project selected: run  gcloud config set project <PROJECT_ID>  first." >&2
