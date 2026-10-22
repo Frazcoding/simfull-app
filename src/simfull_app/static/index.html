@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>simfull — Full Building &amp; Multi-Domain Simulation</title>
+  <meta name="description" content="Multi-zone thermal network model, 1D/2D spatial fields, 2D canvas drawing, 3D STL mesh import, and time-series simulation.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo-mark">Σf</span>
+      <div>
+        <span class="brand-title">simfull</span>
+        <span class="brand-subtitle">SIMULATION SOFTWARE</span>
+      </div>
+    </div>
+
+    <nav class="nav-tabs" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="geometry">1. Geometry &amp; 3D</button>
+      <button type="button" class="tab-btn" data-tab="simulation">2. Network Simulation</button>
+      <button type="button" class="tab-btn" data-tab="thermal-bridge">3. 2D Thermal Bridge</button>
+      <button type="button" class="tab-btn" data-tab="wall-1d">4. 1D Wall Conduction</button>
+      <button type="button" class="tab-btn" data-tab="multi-domain">5. Multi-Domain</button>
+    </nav>
+
+    <div class="top-actions">
+      <button id="btn-run-sim" class="btn btn-primary">▶ Run Simulation</button>
+    </div>
+  </header>
+
+  <main class="content-container">
+
+    <!-- TAB 1: GEOMETRY & 3D -->
+    <section id="panel-geometry" class="tab-panel active">
+      <div class="geometry-layout">
+        
+        <!-- Left: 2D Floorplan Canvas -->
+        <div class="panel-card canvas-card">
+          <div class="card-header">
+            <h3>2D Floorplan Canvas Editor</h3>
+            <div class="canvas-toolbar">
+              <button type="button" id="btn-preset-2room" class="btn btn-small">Preset: 2-Room</button>
+              <button type="button" id="btn-preset-lshape" class="btn btn-small">Preset: L-Shape</button>
+              <button type="button" id="btn-clear-canvas" class="btn btn-small btn-ghost">Clear</button>
+            </div>
+          </div>
+          <div class="canvas-wrapper">
+            <canvas id="floorplan-canvas" width="600" height="420"></canvas>
+            <div class="canvas-hint">Click &amp; drag vertices to edit room polygons. Double-click to add a vertex.</div>
+          </div>
+          <div class="card-footer row space-between">
+            <span id="geometry-stats" class="stats-badge">2 Zones · 7 Walls · 50.0 m² Floor Area</span>
+            <span class="note">Grid: 1m intervals</span>
+          </div>
+        </div>
+
+        <!-- Right: 3D Spatial Viewer & STL Import -->
+        <div class="panel-card viewer-card">
+          <div class="card-header">
+            <h3>3D Spatial Geometry &amp; Mesh</h3>
+            <div class="view-controls">
+              <label class="btn btn-small btn-secondary" for="stl-file-input">
+                📂 Import 3D .STL Mesh
+                <input type="file" id="stl-file-input" accept=".stl" hidden>
+              </label>
+            </div>
+          </div>
+          
+          <div class="canvas-wrapper">
+            <canvas id="spatial-3d-canvas" width="600" height="420"></canvas>
+            <div class="spatial-overlay" id="spatial-overlay">
+              <div class="colorbar">
+                <span class="cb-label">Hot (25°C)</span>
+                <div class="cb-gradient"></div>
+                <span class="cb-label">Cool (15°C)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="time-scrubber-bar">
+            <label for="time-slider">Simulation Hour: <strong id="time-slider-val">12:00 (Hour 12.0)</strong></label>
+            <input type="range" id="time-slider" min="0" max="24" step="0.5" value="12">
+          </div>
+
+          <div class="card-footer">
+            <span class="hint">Surfaces colored dynamically by node temperature from simulation. Drag slider to scrub through day.</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 2: NETWORK SIMULATION RESULTS -->
+    <section id="panel-simulation" class="tab-panel">
+      <!-- Metrics Strip -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-label">Heating Demand</span>
+          <span class="metric-value" id="m-heat-demand">-- kWh</span>
+          <span class="metric-sub" id="m-floor-norm">-- kWh/m²</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Heat Pump Electricity</span>
+          <span class="metric-value" id="m-hp-elec">-- kWh</span>
+          <span class="metric-sub" id="m-scop">Seasonal COP: --</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Solar PV Generation</span>
+          <span class="metric-value" id="m-pv-gen">-- kWh</span>
+          <span class="metric-sub" id="m-net-grid">Net Grid: -- kWh</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Structural Stress</span>
+          <span class="metric-value" id="m-stress">-- MPa</span>
+          <span class="metric-sub">Thermal Expansion</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Energy Conservation</span>
+          <span class="metric-value" id="m-energy-audit">✓ &lt; 10⁻⁶ W</span>
+          <span class="metric-sub">Balance Closed</span>
+        </div>
+      </div>
+
+      <!-- Simulation Config Toolbar -->
+      <div class="sim-config-bar">
+        <label class="field-inline"><span>Weather Location:</span>
+          <select id="sim-weather-select">
+            <option value="winter_design_day">Winter Peak Design Day (-4°C to 2°C)</option>
+            <option value="summer_design_day">Summer Peak Cooling Day (17°C to 31°C)</option>
+            <option value="london_shoulder">London Shoulder Season (5°C to 14°C)</option>
+            <option value="continental_annual">Frankfurt European Profile (1°C to 9°C)</option>
+          </select>
+        </label>
+
+        <label class="field-inline"><span>Construction Assembly:</span>
+          <select id="sim-construction-select">
+            <option value="brick_cavity">Cavity Wall (Brick + PIR 100mm, U=0.20)</option>
+            <option value="timber_frame">Timber Frame (Mineral Wool + PIR, U=0.18)</option>
+            <option value="solid_brick_uninsulated">Uninsulated Solid Brick (U=1.85)</option>
+          </select>
+        </label>
+
+        <label class="field-inline"><span>Heat Pump:</span>
+          <input type="number" id="sim-hp-kw" value="8" min="2" max="50" style="width: 60px;"> kW
+        </label>
+
+        <label class="field-inline"><span>Solar PV:</span>
+          <input type="number" id="sim-pv-m2" value="20" min="0" max="200" style="width: 60px;"> m²
+        </label>
+      </div>
+
+      <!-- Graphs Grid -->
+      <div class="charts-grid">
+        <div class="panel-card">
+          <h3>Zone Air &amp; Plant Temperatures (°C)</h3>
+          <div class="chart-container" id="chart-temperatures"></div>
+        </div>
+
+        <div class="panel-card">
+          <h3>Heating Demand &amp; Electrical Powers (kW)</h3>
+          <div class="chart-container" id="chart-powers"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: 2D THERMAL BRIDGE (EN ISO 10211) -->
+    <section id="panel-thermal-bridge" class="tab-panel">
+      <div class="tb-layout">
+        <div class="panel-card" style="flex: 1;">
+          <div class="card-header">
+            <h3>2D Finite-Difference Temperature Field (EN ISO 10211)</h3>
+            <div class="row gap-8">
+              <select id="tb-junction-type">
+                <option value="wall_corner">External Wall Corner Junction</option>
+                <option value="wall_floor">Intermediate Floor Slab Junction</option>
+                <option value="window_reveal">Window Frame Reveal Junction</option>
+              </select>
+              <button type="button" id="btn-solve-tb" class="btn btn-secondary btn-small">Solve 2D Field</button>
+            </div>
+          </div>
+          <div class="canvas-wrapper">
+            <canvas id="tb-contour-canvas" width="600" height="450"></canvas>
+          </div>
+          <div class="card-footer">
+            <span>5-point Laplacian finite difference grid with harmonic interface conductances.</span>
+          </div>
+        </div>
+
+        <div class="panel-card tb-results-card">
+          <h3>Junction Verification Metrics</h3>
+          <div class="metric-row">
+            <span class="lbl">Linear Transmittance (Ψ):</span>
+            <strong class="val" id="tb-val-psi">0.052 W/(m·K)</strong>
+          </div>
+          <div class="metric-row">
+            <span class="lbl">Min Surface Temp (T<sub>si,min</sub>):</span>
+            <strong class="val" id="tb-val-tsimin">16.8 °C</strong>
+          </div>
+          <div class="metric-row">
+            <span class="lbl">Temperature Factor (f<sub>Rsi</sub>):</span>
+            <strong class="val" id="tb-val-frsi">0.84</strong>
+          </div>
+          <div class="metric-row">
+            <span class="lbl">Condensation / Mold Risk:</span>
+            <span class="badge badge-success" id="tb-val-risk">PASS (f<sub>Rsi</sub> ≥ 0.70)</span>
+          </div>
+          <div class="metric-row">
+            <span class="lbl">Total 2D Heat Flow (L<sup>2D</sup>):</span>
+            <strong class="val" id="tb-val-l2d">4.92 W/m</strong>
+          </div>
+          <hr>
+          <p class="hint">Conforms strictly to <strong>EN ISO 10211</strong> standard benchmark calculations for thermal transmittance and surface condensation assessment.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: 1D WALL CONDUCTION -->
+    <section id="panel-wall-1d" class="tab-panel">
+      <div class="wall1d-layout">
+        <div class="panel-card" style="flex: 2;">
+          <div class="card-header">
+            <h3>1D Transient Temperature Wave Through Multi-Layer Wall</h3>
+            <button type="button" id="btn-solve-wall1d" class="btn btn-secondary btn-small">Simulate 1D Wave</button>
+          </div>
+          <div class="canvas-wrapper">
+            <canvas id="wall1d-canvas" width="640" height="380"></canvas>
+          </div>
+          <div class="card-footer">
+            <span id="wall1d-desc">Discretized spatial control volumes solved via implicit backward-Euler.</span>
+          </div>
+        </div>
+
+        <div class="panel-card" style="flex: 1;">
+          <h3>Construction Assembly Layers</h3>
+          <table class="layers-table" id="wall1d-layers-table">
+            <thead><tr><th>Layer</th><th>Material</th><th>Thickness</th><th>Conductivity</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div style="margin-top: 14px;">
+            <p><strong>U-Value:</strong> <span id="wall1d-uval">0.22</span> W/(m²·K)</p>
+            <p class="hint">Thermal mass dampens and shifts the outdoor diurnal wave, reducing peak heat pump electrical demand.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: MULTI-DOMAIN EXPANSION ARCHITECTURE -->
+    <section id="panel-multi-domain" class="tab-panel">
+      <div class="panel-card">
+        <h3>Extensible Multi-Domain Network Architecture</h3>
+        <p>The core simulation engine uses a domain-agnostic state graph. New physical equations bind directly into the network without altering the solver:</p>
+        
+        <div class="domain-grid">
+          <div class="domain-card">
+            <h4>♨ Thermal Domain</h4>
+            <ul>
+              <li>Room air nodes &amp; interior thermal mass</li>
+              <li>Multi-layer wall transmission</li>
+              <li>Window glazing &amp; solar radiation</li>
+              <li>Stratified storage tanks &amp; emitters</li>
+            </ul>
+          </div>
+
+          <div class="domain-card">
+            <h4>💧 Fluid / Hydronic Domain</h4>
+            <ul>
+              <li>Pipe loops with mass flow rates $\dot{m}$</li>
+              <li>Heat pump refrigerant cycle COP</li>
+              <li>Thermostatic emitter modulation</li>
+              <li>Stratified thermal buoyancy layers</li>
+            </ul>
+          </div>
+
+          <div class="domain-card">
+            <h4>⚡ Electrical Domain</h4>
+            <ul>
+              <li>Solar Photovoltaic array output</li>
+              <li>Heat pump compressor electrical demand</li>
+              <li>Battery storage state-of-charge</li>
+              <li>Net grid import / export tracking</li>
+            </ul>
+          </div>
+
+          <div class="domain-card">
+            <h4>🏛 Structural Domain</h4>
+            <ul>
+              <li>Thermal expansion strain $\epsilon_{th} = \alpha \Delta T$</li>
+              <li>Restraint thermal stress $\sigma = E \epsilon_{th}$</li>
+              <li>Junction movement monitoring</li>
+              <li>Dynamic structural safety audits</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+</body>
+</html>
